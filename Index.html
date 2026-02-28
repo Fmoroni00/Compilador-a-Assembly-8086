@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compilador a Assembly 8086</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Familjen+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #151936;
+            --bg-tertiary: #1e2447;
+            --accent-1: #00f5d4;
+            --accent-2: #7b2cbf;
+            --text-primary: #e0e7ff;
+            --text-secondary: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #fbbf24;
+            
+            --token-num: #34d399;
+            --machine-code: #ff6b9d;
+        }
+
+        body {
+            font-family: 'Familjen Grotesk', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(123, 44, 191, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 245, 212, 0.1) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+        }
+
+        .language-info {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent-1);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 2rem auto;
+            max-width: 800px;
+        }
+
+        .language-info h3 {
+            color: var(--accent-1);
+            margin-bottom: 0.5rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--bg-tertiary);
+        }
+
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, var(--accent-1), var(--accent-2));
+            border-radius: 2px;
+        }
+
+        .code-editor {
+            width: 100%;
+            min-height: 400px;
+            padding: 1.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .code-editor:focus {
+            outline: none;
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px rgba(0, 245, 212, 0.1);
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Familjen Grotesk', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: var(--bg-primary);
+            box-shadow: 0 4px 16px rgba(0, 245, 212, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 24px rgba(0, 245, 212, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent-1);
+        }
+
+        .btn-example {
+            background: linear-gradient(135deg, var(--warning), #f59e0b);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
+        }
+
+        .btn-example:hover {
+            box-shadow: 0 6px 24px rgba(251, 191, 36, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .results-panel {
+            grid-column: 1 / -1;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-1);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-success .stat-value { color: var(--success); }
+        .stat-warning .stat-value { color: var(--warning); }
+        .stat-error .stat-value { color: var(--error); }
+        .stat-machine .stat-value { color: var(--machine-code); }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--error);
+            margin-top: 1rem;
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--success);
+            margin-top: 1rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .section-title {
+            color: var(--accent-1);
+            margin: 2rem 0 1rem 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 3px;
+            height: 20px;
+            background: var(--accent-1);
+            border-radius: 2px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .panel {
+                padding: 1rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Compilador a Assembly 8086</h1>
+            <p class="subtitle">Suma y Resta con rutinas completas de CIN y COUT</p>
+            
+            <div class="language-info">
+                <h3>Sintaxis C Soportada</h3>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                    <strong>Entrada:</strong> cin >> variable;<br>
+                    <strong>Salida:</strong> cout << variable; o cout << expresion;<br>
+                    <strong>Operadores:</strong> + - (solo suma y resta)<br>
+                    <strong>Comparación:</strong> == != > < >= <=<br>
+                    <strong>Asignaciones:</strong> variable = expresion;<br>
+                    <strong>Estructuras:</strong> if, while, do-while<br>
+                    <strong>Comentarios:</strong> // comentario
+                </p>
+            </div>
+        </header>
+
+        <div class="main-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Código Fuente C++</h2>
+                </div>
+                
+                <textarea id="codigoFuente" class="code-editor">// Programa: Leer 6 números e imprimir el mayor y menor (usando WHILE)
+cin >> num1;
+mayor = num1;
+menor = num1;
+contador = 1;
+
+// Leer y comparar los siguientes 5 números con WHILE
+while (contador < 6)
+{
+    cin >> numero;
+    
+    // Verificar si es mayor
+    if (numero > mayor)
+    {
+        mayor = numero;
+    }
+    
+    // Verificar si es menor
+    if (numero < menor)
+    {
+        menor = numero;
+    }
+    
+    contador = contador + 1;
+}
+
+// Imprimir resultados
+cout << mayor;
+cout << menor;</textarea>
+
+                <div class="actions">
+                    <button id="btnCompilar" class="btn btn-primary">Compilar Código</button>
+                    <button id="btnLimpiar" class="btn btn-secondary">Limpiar</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Estadísticas</h2>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat-card stat-success">
+                        <div class="stat-value" id="statLineas">0</div>
+                        <div class="stat-label">Líneas de Código</div>
+                    </div>
+                    <div class="stat-card stat-machine">
+                        <div class="stat-value" id="statInstrucciones">0</div>
+                        <div class="stat-label">Instrucciones ASM</div>
+                    </div>
+                    <div class="stat-card stat-error">
+                        <div class="stat-value" id="statErrores">0</div>
+                        <div class="stat-label">Errores</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel results-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Resultados de Compilación</h2>
+                </div>
+
+                <div id="statusContainer"></div>
+
+                <!-- Linearización -->
+                <div id="linearizacionSection" style="display: none;">
+                    <div class="section-title">1. Código Linealizado</div>
+                    <div id="linearizacionContainer"></div>
+                </div>
+
+                <!-- Tercetos -->
+                <div id="tercetosSection" style="display: none;">
+                    <div class="section-title">2. Código en Tercetos</div>
+                    <div id="tercetosContainer"></div>
+                </div>
+
+                <!-- Assembly -->
+                <div id="assemblySection" style="display: none;">
+                    <div class="section-title">3. Código Assembly 8086</div>
+                    <div id="asmCodeContainer"></div>
+                </div>
+
+                <div id="emptyState">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚙️</div>
+                        <p>Presiona "Compilar Código" para ver: Linealización → Tercetos → Assembly</p>
+                    </div>
+                </div>
+
+                <div id="errorsSection" class="error-message" style="display: none;">
+                    <div id="errorsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Compilador C++ a Assembly 8086 con código intermedio
+        class CPPToAsm8086 {
+            constructor(source) {
+                this.source = source;
+                this.lines = source.split('\n');
+                this.errors = [];
+                this.intermediateCode = [];
+                this.asmCode = [];
+                this.variables = new Set();
+                this.labelCount = 0;
+                this.tempVarCount = 0;
+                this.labelMap = new Map();
+            }
+
+            getLabel() {
+                return `L${this.labelCount++}`;
+            }
+
+            getTempVar() {
+                const temp = `T${this.tempVarCount++}`;
+                this.variables.add(temp);
+                return temp;
+            }
+
+            addIntermediate(op, arg1 = '', arg2 = '', arg3 = '') {
+                this.intermediateCode.push({ op, arg1, arg2, arg3 });
+            }
+
+            addAsm(instruction) {
+                this.asmCode.push({ instruction });
+            }
+
+            parseBlock(startIndex) {
+                let i = startIndex;
+                const statements = [];
+                let braceCount = 0;
+                let foundOpenBrace = false;
+
+                while (i < this.lines.length) {
+                    const line = this.lines[i].trim();
+                    if (line === '{') {
+                        foundOpenBrace = true;
+                        braceCount = 1;
+                        i++;
+                        break;
+                    }
+                    i++;
+                }
+
+                if (!foundOpenBrace) return { statements: [], endIndex: startIndex };
+
+                while (i < this.lines.length && braceCount > 0) {
+                    const line = this.lines[i].trim();
+
+                    if (line === '{') braceCount++;
+                    else if (line === '}') {
+                        braceCount--;
+                        if (braceCount === 0) break;
+                    }
+
+                    if (line !== '' && line !== '{' && line !== '}') {
+                        statements.push({ line: this.lines[i], lineNum: i + 1 });
+                    }
+                    i++;
+                }
+
+                return { statements, endIndex: i };
+            }
+
+            compileCondition(condition) {
+                let operator = '', left = '', right = '';
+                const ops = ['==', '!=', '>=', '<=', '>', '<'];
+
+                for (let op of ops) {
+                    if (condition.includes(op)) {
+                        [left, right] = condition.split(op).map(s => s.trim());
+                        operator = op;
+                        break;
+                    }
+                }
+
+                if (!isNaN(left)) this.variables.add(left);
+                if (!isNaN(right)) this.variables.add(right);
+
+                return { left, operator, right };
+            }
+
+            compileExpressionIntermediate(expression) {
+                const tokens = this.tokenize(expression);
+
+                if (tokens.length === 1) {
+                    if (!isNaN(tokens[0])) return tokens[0];
+                    this.variables.add(tokens[0]);
+                    return tokens[0];
+                }
+
+                let result = tokens[0];
+                if (!isNaN(result)) {
+                    const temp = this.getTempVar();
+                    this.addIntermediate('=', result, '', temp);
+                    result = temp;
+                } else {
+                    this.variables.add(result);
+                }
+
+                for (let i = 1; i < tokens.length; i += 2) {
+                    const operator = tokens[i];
+                    const operand = tokens[i + 1];
+
+                    if (!operand) break;
+                    this.variables.add(operand);
+
+                    const temp = this.getTempVar();
+                    this.addIntermediate(operator, result, operand, temp);
+                    result = temp;
+                }
+
+                return result;
+            }
+
+            tokenize(expression) {
+                const tokens = [];
+                let current = '';
+                for (let i = 0; i < expression.length; i++) {
+                    const char = expression[i];
+                    if (char === ' ' || char === '\t') {
+                        if (current) { tokens.push(current); current = ''; }
+                        continue;
+                    }
+                    if ('+-()'.includes(char)) {
+                        if (current) { tokens.push(current); current = ''; }
+                        tokens.push(char);
+                    } else {
+                        current += char;
+                    }
+                }
+                if (current) tokens.push(current);
+                return tokens;
+            }
+
+            generateIntermediateCode() {
+                // Iniciamos el procesamiento recursivo con todas las líneas
+                this.processBlock(this.lines);
+            }
+
+            processBlock(linesArray) {
+                let i = 0;
+                while (i < linesArray.length) {
+                    let rawLine = linesArray[i];
+                    let line = rawLine.trim();
+
+                    // Ignorar líneas vacías, llaves sueltas y comentarios
+                    if (line === '' || line === '{' || line === '}' || line.startsWith('//')) {
+                        i++;
+                        continue;
+                    }
+
+                    if (line.startsWith('while')) {
+                        // Limpiar la condición (quitar llaves y paréntesis)
+                        let condition = line.substring(5).trim();
+                        if (condition.endsWith('{')) condition = condition.slice(0, -1).trim();
+                        condition = condition.replace(/[()]/g, '').trim();
+
+                        const { left, operator, right } = this.compileCondition(condition);
+
+                        const labelStart = this.getLabel();
+                        const labelEnd = this.getLabel();
+
+                        this.addIntermediate('LABEL', labelStart);
+                        this.addIntermediate('IF_FALSE_GOTO', condition, labelEnd);
+
+                        this.addIntermediate('RESTA_COMP', left, right);
+                        this.addIntermediate('BC', labelEnd);
+                        if (operator === '<') this.addIntermediate('BP', labelEnd);
+                        else if (operator === '>') this.addIntermediate('BN', labelEnd);
+
+                        // Extraer y procesar RECURSIVAMENTE lo que hay dentro del while
+                        const { blockLines, nextIndex } = this.extractBlock(linesArray, i);
+                        this.processBlock(blockLines);
+
+                        this.addIntermediate('GOTO', labelStart);
+                        this.addIntermediate('LABEL', labelEnd);
+
+                        i = nextIndex;
+                    }
+                    else if (line.startsWith('if')) {
+                        // Limpiar la condición del if
+                        let condition = line.substring(2).trim();
+                        if (condition.endsWith('{')) condition = condition.slice(0, -1).trim();
+                        condition = condition.replace(/[()]/g, '').trim();
+
+                        const { left, operator, right } = this.compileCondition(condition);
+
+                        const labelFalse = this.getLabel();
+
+                        this.addIntermediate('IF_FALSE_GOTO', condition, labelFalse);
+                        this.addIntermediate('RESTA_COMP', left, right);
+                        this.addIntermediate('BC', labelFalse);
+
+                        // Inversión de saltos para evaluar falsos
+                        if (operator === '>') this.addIntermediate('BN', labelFalse);
+                        else if (operator === '<') this.addIntermediate('BP', labelFalse);
+
+                        // Extraer y procesar RECURSIVAMENTE lo que hay dentro del if
+                        const { blockLines, nextIndex } = this.extractBlock(linesArray, i);
+                        this.processBlock(blockLines);
+
+                        this.addIntermediate('LABEL', labelFalse);
+                        i = nextIndex;
+                    }
+                    else {
+                        // Si no es control de flujo, compilar instrucción normal
+                        this.compileStatementIntermediate(rawLine);
+                        i++;
+                    }
+                }
+            }
+
+            extractBlock(linesArray, startIndex) {
+                let i = startIndex;
+                let blockLines = [];
+                let braceCount = 0;
+                let inBlock = false;
+
+                // Comprobar si la llave abre en la misma línea del while/if
+                if (linesArray[i].includes('{')) {
+                    braceCount = 1;
+                    inBlock = true;
+                }
+
+                i++; // Pasar a la siguiente línea
+
+                while (i < linesArray.length) {
+                    let line = linesArray[i].trim();
+
+                    if (!inBlock) {
+                        // Si encontramos una llave en la siguiente línea, entramos al bloque
+                        if (line === '{') {
+                            inBlock = true;
+                            braceCount = 1;
+                            i++;
+                            continue;
+                        }
+                        // Ignorar comentarios y líneas vacías antes del bloque
+                        if (line === '' || line.startsWith('//')) {
+                            i++;
+                            continue;
+                        }
+                        // Si no hay llaves, es un bloque de una sola línea (ej. un if sin llaves)
+                        blockLines.push(linesArray[i]);
+                        return { blockLines, nextIndex: i + 1 };
+                    } else {
+                        // Procesar bloque con llaves anidadas
+                        if (line.includes('{')) braceCount++;
+                        if (line.includes('}')) braceCount--;
+
+                        if (braceCount === 0) {
+                            return { blockLines, nextIndex: i + 1 };
+                        }
+                        blockLines.push(linesArray[i]);
+                        i++;
+                    }
+                }
+                return { blockLines, nextIndex: i };
+            }
+
+            compileStatementIntermediate(rawLine) {
+                let line = rawLine.trim().replace(/;/g, '');
+                if (line.startsWith('//')) return; // Bloqueo de seguridad para comentarios
+
+                this.addIntermediate('SOURCE_LINE', line + ';');
+
+                if (line.startsWith('cin')) {
+                    const varName = line.split('>>')[1].trim();
+                    this.variables.add(varName);
+                    this.addIntermediate('READ', varName);
+                } else if (line.startsWith('cout')) {
+                    const expression = line.includes('<<') ? line.split('<<')[1].trim() : line.substring(4).trim();
+                    const result = this.compileExpressionIntermediate(expression);
+                    this.addIntermediate('WRITE', result);
+                } else if (/^[a-zA-Z_][a-zA-Z0-9_]*\s*=/.test(line)) {
+                    const parts = line.split('=');
+                    const varName = parts[0].trim();
+                    const expression = parts[1].trim();
+                    this.variables.add(varName);
+                    const result = this.compileExpressionIntermediate(expression);
+                    this.addIntermediate('=', result, '', varName);
+                }
+            }
+
+            generateLinearization() {
+                const linear = [];
+                let labelCounter = 1;
+
+                // Asignación estricta de orden E1, E2... basándose en cuando aparece el LABEL
+                this.intermediateCode.forEach(instr => {
+                    if (instr.op === 'LABEL' && !this.labelMap.has(instr.arg1)) {
+                        this.labelMap.set(instr.arg1, `E${labelCounter++}`);
+                    }
+                });
+
+                let pendingLabel = '';
+                let hasLabels = false;
+
+                this.intermediateCode.forEach(instr => {
+                    let line = '';
+                    switch (instr.op) {
+                        case 'LABEL':
+                            pendingLabel = `${this.labelMap.get(instr.arg1)}: `;
+                            hasLabels = true;
+                            break;
+                        case 'IF_FALSE_GOTO':
+                            line = pendingLabel ? `${pendingLabel}if !(${instr.arg1}) goto ${this.labelMap.get(instr.arg2)}` : `    if !(${instr.arg1}) goto ${this.labelMap.get(instr.arg2)}`;
+                            pendingLabel = '';
+                            break;
+                        case 'SOURCE_LINE':
+                            if (pendingLabel) {
+                                line = `${pendingLabel}${instr.arg1}`;
+                            } else {
+                                line = hasLabels ? `    ${instr.arg1}` : instr.arg1;
+                            }
+                            pendingLabel = '';
+                            break;
+                        case 'GOTO':
+                            line = pendingLabel ? `${pendingLabel}goto ${this.labelMap.get(instr.arg1)}` : `    goto ${this.labelMap.get(instr.arg1)}`;
+                            pendingLabel = '';
+                            break;
+                    }
+                    if (line) linear.push(line);
+                });
+
+                if (pendingLabel) linear.push(pendingLabel);
+                return linear;
+            }
+
+            generateTriplets() {
+                const triplets = [];
+                let index = 1;
+                const labelPositions = new Map();
+                const tempToIndex = new Map();
+
+                let tempIndex = 1;
+                this.intermediateCode.forEach(instr => {
+                    if (instr.op === 'LABEL') {
+                        labelPositions.set(instr.arg1, tempIndex);
+                    } else if (['READ', '=', '+', '-', 'RESTA_COMP', 'WRITE', 'BC', 'BP', 'BN', 'GOTO'].includes(instr.op)) {
+                        if (['+', '-'].includes(instr.op)) {
+                            tempToIndex.set(instr.arg3, tempIndex);
+                        }
+                        tempIndex++;
+                    }
+                });
+
+                this.intermediateCode.forEach(instr => {
+                    let text = '';
+
+                    switch (instr.op) {
+                        case 'READ':
+                            text = `(${index}) cin, ${instr.arg1},`;
+                            index++;
+                            break;
+                        case '=':
+                            let val = instr.arg1;
+                            if (tempToIndex.has(val)) val = `(${tempToIndex.get(val)})`;
+                            text = `(${index}) =, ${instr.arg3}, ${val}`;
+                            index++;
+                            break;
+                        case '+':
+                            text = `(${index}) +, ${instr.arg1}, ${instr.arg2}`;
+                            index++;
+                            break;
+                        case '-':
+                            text = `(${index}) -, ${instr.arg1}, ${instr.arg2}`;
+                            index++;
+                            break;
+                        case 'RESTA_COMP':
+                            text = `(${index}) -, ${instr.arg1}, ${instr.arg2}`;
+                            index++;
+                            break;
+                        case 'WRITE':
+                            text = `(${index}) cout, ${instr.arg1},`;
+                            index++;
+                            break;
+                        case 'BC':
+                        case 'BP':
+                        case 'BN':
+                            text = `(${index}) ${instr.op}, ${labelPositions.get(instr.arg1)}`;
+                            index++;
+                            break;
+                        case 'GOTO':
+                            text = `(${index}) B, ${labelPositions.get(instr.arg1)}`;
+                            index++;
+                            break;
+                    }
+
+                    if (text) {
+                        triplets.push(text);
+                    }
+                });
+
+                return triplets;
+            }
+
+            generateAssemblyFromIntermediate() {
+                this.intermediateCode.forEach(instr => {
+                    switch (instr.op) {
+                        case '=':
+                            this.addAsm(`    MOV AL, ${instr.arg1}`);
+                            this.addAsm(`    MOV ${instr.arg3}, AL`);
+                            break;
+                        case '+':
+                            this.addAsm(`    MOV AL, ${instr.arg1}`);
+                            this.addAsm(`    ADD AL, ${instr.arg2}`);
+                            this.addAsm(`    MOV ${instr.arg3}, AL`);
+                            break;
+                        case '-':
+                            this.addAsm(`    MOV AL, ${instr.arg1}`);
+                            this.addAsm(`    SUB AL, ${instr.arg2}`);
+                            this.addAsm(`    MOV ${instr.arg3}, AL`);
+                            break;
+                        case 'RESTA_COMP':
+                            this.addAsm(`    MOV AL, ${instr.arg1}`);
+                            this.addAsm(`    SUB AL, ${instr.arg2}`);
+                            break;
+                        case 'READ':
+                            this.addAsm(`    CALL LEE_NUM`);
+                            this.addAsm(`    MOV ${instr.arg1}, AL`);
+                            break;
+                        case 'WRITE':
+                            this.addAsm(`    MOV DL, ${instr.arg1}`);
+                            this.addAsm(`    CALL IMP_NUM`);
+                            break;
+                        case 'LABEL':
+                            this.addAsm(`${instr.arg1}:`);
+                            break;
+                        case 'GOTO':
+                            this.addAsm(`    JMP ${instr.arg1}`);
+                            break;
+                        case 'BC':
+                            this.addAsm(`    JZ ${instr.arg1}`);
+                            break;
+                        case 'BP':
+                            this.addAsm(`    JNS ${instr.arg1}`);
+                            break;
+                        case 'BN':
+                            this.addAsm(`    JS ${instr.arg1}`);
+                            break;
+                    }
+                });
+            }
+
+            generateFullProgram() {
+                const fullCode = [];
+                fullCode.push({ instruction: 'ORG 100h' }, { instruction: '' });
+
+                for (const varName of this.variables) {
+                    if (!isNaN(varName)) continue;
+                    fullCode.push({ instruction: `${varName} DB 0` });
+                }
+
+                fullCode.push({ instruction: '' }, { instruction: 'INICIO:' });
+                fullCode.push(...this.asmCode);
+                fullCode.push({ instruction: '' }, { instruction: '    RET' }, { instruction: '' });
+
+                // Rutinas LEE_NUM e IMP_NUM...
+                fullCode.push({ instruction: 'PROC LEE_NUM' }, { instruction: '    PUSH BX' }, { instruction: '    PUSH CX' });
+                fullCode.push({ instruction: '    MOV AH, 01' }, { instruction: '    INT 21h' }, { instruction: '    SUB AL, 30h' });
+                fullCode.push({ instruction: '    MOV BL, AL' }, { instruction: '    MOV AH, 01' }, { instruction: '    INT 21h' });
+                fullCode.push({ instruction: '    SUB AL, 30h' }, { instruction: '    MOV CX, 10' }, { instruction: 'F1:' });
+                fullCode.push({ instruction: '    ADD AL, BL' }, { instruction: '    LOOP F1' }, { instruction: '    POP CX' });
+                fullCode.push({ instruction: '    POP BX' }, { instruction: '    RET' }, { instruction: 'ENDP' }, { instruction: '' });
+
+                fullCode.push({ instruction: 'PROC IMP_NUM' }, { instruction: '    PUSH BX' }, { instruction: '    MOV BL, DL' });
+                fullCode.push({ instruction: '    MOV DL, 0' }, { instruction: 'F2:' }, { instruction: '    CMP BL, 9' });
+                fullCode.push({ instruction: '    JLE E3' }, { instruction: '    SUB BL, 10' }, { instruction: '    INC DL' });
+                fullCode.push({ instruction: '    JMP F2' }, { instruction: 'E3:' }, { instruction: '    ADD DL, 30h' });
+                fullCode.push({ instruction: '    MOV AH, 02' }, { instruction: '    INT 21h' }, { instruction: '    MOV DL, BL' });
+                fullCode.push({ instruction: '    ADD DL, 30h' }, { instruction: '    INT 21h' }, { instruction: '    POP BX' });
+                fullCode.push({ instruction: '    RET' }, { instruction: 'ENDP' }, { instruction: '' }, { instruction: 'END' });
+
+                return fullCode;
+            }
+
+            compile() {
+                let sourceLines = this.lines.filter(l => l.trim() !== '' && !l.trim().startsWith('//')).length;
+
+                this.generateIntermediateCode();
+                const linearizacion = this.generateLinearization();
+                const tercetos = this.generateTriplets();
+                this.generateAssemblyFromIntermediate();
+                const fullProgram = this.generateFullProgram();
+
+                return {
+                    asmCode: fullProgram,
+                    intermediateCode: this.intermediateCode,
+                    linearizacion: linearizacion,
+                    tercetos: tercetos,
+                    errors: this.errors,
+                    sourceLines: sourceLines
+                };
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        const btnCompilar = document.getElementById('btnCompilar');
+        const btnLimpiar = document.getElementById('btnLimpiar');
+        const codigoFuente = document.getElementById('codigoFuente');
+        const linearizacionContainer = document.getElementById('linearizacionContainer');
+        const tercetosContainer = document.getElementById('tercetosContainer');
+        const asmCodeContainer = document.getElementById('asmCodeContainer');
+        const errorsSection = document.getElementById('errorsSection');
+        const errorsList = document.getElementById('errorsList');
+        const statusContainer = document.getElementById('statusContainer');
+        const linearizacionSection = document.getElementById('linearizacionSection');
+        const tercetosSection = document.getElementById('tercetosSection');
+        const assemblySection = document.getElementById('assemblySection');
+        const emptyState = document.getElementById('emptyState');
+
+        btnCompilar.addEventListener('click', () => {
+            const code = codigoFuente.value.trim();
+            if (!code) { alert('Ingresa código para compilar'); return; }
+
+            const compiler = new CPPToAsm8086(code);
+            const result = compiler.compile();
+            displayResults(result);
+        });
+
+        btnLimpiar.addEventListener('click', () => {
+            codigoFuente.value = '';
+            emptyState.style.display = 'block';
+            linearizacionSection.style.display = 'none';
+            tercetosSection.style.display = 'none';
+            assemblySection.style.display = 'none';
+            errorsSection.style.display = 'none';
+            statusContainer.innerHTML = '';
+            document.getElementById('statLineas').textContent = '0';
+            document.getElementById('statInstrucciones').textContent = '0';
+            document.getElementById('statErrores').textContent = '0';
+        });
+
+        function displayResults(result) {
+            document.getElementById('statLineas').textContent = result.sourceLines;
+            document.getElementById('statInstrucciones').textContent = result.asmCode.length;
+            document.getElementById('statErrores').textContent = result.errors.length;
+
+            if (result.errors.length === 0) {
+                statusContainer.innerHTML = `
+                <div class="success-message">
+                    <strong>✓ Compilación exitosa</strong><br>
+                    Proceso completado: Linealización → Tercetos → Assembly 8086
+                </div>
+            `;
+            }
+
+            emptyState.style.display = 'none';
+            linearizacionSection.style.display = 'block';
+            tercetosSection.style.display = 'block';
+            assemblySection.style.display = 'block';
+
+            // 1. LINEARIZACIÓN
+            let linearHtml = '<div style="background: var(--bg-primary); padding: 1.5rem; border-radius: 8px; font-family: \'JetBrains Mono\', monospace; font-size: 0.9rem; line-height: 1.8; white-space: pre;">';
+            result.linearizacion.forEach(line => {
+                const color = line.includes('if !(') || line.includes('goto') ? 'var(--warning)' :
+                    line.match(/E\d+:/) ? 'var(--accent-1)' : 'var(--text-primary)';
+                linearHtml += `<div style="color: ${color};">${escapeHtml(line)}</div>`;
+            });
+            linearHtml += '</div>';
+            linearizacionContainer.innerHTML = linearHtml;
+
+            // 2. TERCETOS
+            let tercetosHtml = '<div style="background: var(--bg-primary); padding: 1.5rem; border-radius: 8px; font-family: \'JetBrains Mono\', monospace; font-size: 0.9rem; line-height: 1.8; white-space: pre;">';
+            result.tercetos.forEach(line => {
+                tercetosHtml += `<div style="color: var(--text-primary);">${escapeHtml(line)}</div>`;
+            });
+            tercetosHtml += '</div>';
+            tercetosContainer.innerHTML = tercetosHtml;
+
+            // 3. ASSEMBLY
+            let asmHtml = '<div style="background: var(--bg-primary); padding: 1.5rem; border-radius: 8px; font-family: \'JetBrains Mono\', monospace; font-size: 0.9rem; line-height: 1.8; white-space: pre;">';
+            result.asmCode.forEach(line => {
+                if (line.instruction === '') { asmHtml += '<br>'; }
+                else if (line.instruction.startsWith('ORG') || line.instruction.includes('PROC') || line.instruction.includes('ENDP') || line.instruction === 'END' || line.instruction.endsWith(':')) {
+                    asmHtml += `<div style="color: var(--accent-1); font-weight: bold;">${escapeHtml(line.instruction)}</div>`;
+                } else if (line.instruction.includes('DB')) {
+                    asmHtml += `<div style="color: var(--token-num);">${escapeHtml(line.instruction)}</div>`;
+                } else {
+                    asmHtml += `<div style="color: var(--text-primary);">${escapeHtml(line.instruction)}</div>`;
+                }
+            });
+            asmHtml += '</div>';
+            asmCodeContainer.innerHTML = asmHtml;
+        }
+    </script>
+
+</body>
+</html>
